@@ -4,31 +4,31 @@ package services
 import (
 	"context"
 	"errors"
-	"fmt"
-	"io"
+	"time"
 
-	"github.com/cloudinary/cloudinary-go/v2"
-	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
-	"github.com/yourname/mapapp/models"
-	"github.com/yourname/mapapp/repositories"
+	"github.com/google/uuid"
+	"github.com/shimaf4979/pamfree-backend/models"
+	"github.com/shimaf4979/pamfree-backend/repositories"
 )
 
-// PinService はピン関連のビジネスロジックを提供するインターフェース
+// PinService はピンに関する操作を提供するインターフェース
 type PinService interface {
-	CreatePin(ctx context.Context, req models.PinCreate, userID string) (*models.Pin, error)
-	GetPinsByFloorID(ctx context.Context, floorID string) ([]*models.Pin, error)
-	GetPinByID(ctx context.Context, id string) (*models.Pin, error)
-	UpdatePin(ctx context.Context, id string, req models.PinUpdate, userID string) (*models.Pin, error)
-	DeletePin(ctx context.Context, id string, userID string) error
-	UploadPinImage(ctx context.Context, pinID string, userID string, file io.Reader) (string, error)
+	Create(ctx context.Context, userID string, input *models.PinCreate) (*models.Pin, error)
+	CreatePublic(ctx context.Context, input *models.PinCreate) (*models.Pin, error)
+	GetByID(ctx context.Context, id string) (*models.Pin, error)
+	GetByFloorID(ctx context.Context, floorID string) ([]*models.Pin, error)
+	GetByFloorIDs(ctx context.Context, floorIDs []string) ([]*models.Pin, error)
+	Update(ctx context.Context, userID string, id string, input *models.PinUpdate) (*models.Pin, error)
+	UpdatePublic(ctx context.Context, editorID string, id string, input *models.PinUpdate) (*models.Pin, error)
+	Delete(ctx context.Context, userID string, id string) error
+	DeletePublic(ctx context.Context, editorID string, id string) error
 }
 
-// PinServiceImpl はPinServiceの実装
-type PinServiceImpl struct {
-	pinRepo    repositories.PinRepository
-	floorRepo  repositories.FloorRepository
-	mapRepo    repositories.MapRepository
-	cloudinary *cloudinary.Cloudinary
+// DefaultPinService はPinServiceの実装
+type DefaultPinService struct {
+	pinRepo   repositories.PinRepository
+	floorRepo repositories.FloorRepository
+	mapRepo   repositories.MapRepository
 }
 
 // NewPinService は新しいPinServiceを作成する
@@ -36,192 +36,176 @@ func NewPinService(
 	pinRepo repositories.PinRepository,
 	floorRepo repositories.FloorRepository,
 	mapRepo repositories.MapRepository,
-	cloudinary *cloudinary.Cloudinary,
 ) PinService {
-	return &PinServiceImpl{
-		pinRepo:    pinRepo,
-		floorRepo:  floorRepo,
-		mapRepo:    mapRepo,
-		cloudinary: cloudinary,
+	return &DefaultPinService{
+		pinRepo:   pinRepo,
+		floorRepo: floorRepo,
+		mapRepo:   mapRepo,
 	}
 }
 
-// CreatePin は新しいピンを作成する
-func (s *PinServiceImpl) CreatePin(ctx context.Context, req models.PinCreate, userID string) (*models.Pin, error) {
-	// フロアを取得
-	floor, err := s.floorRepo.GetByID(ctx, req.FloorID)
+// Create は新しいピンを作成する
+func (s *DefaultPinService) Create(ctx context.Context, userID string, input *models.PinCreate) (*models.Pin, error) {
+	// フロアが存在するか確認
+	floor, err := s.floorRepo.GetByID(ctx, input.FloorID)
 	if err != nil {
 		return nil, err
 	}
-
 	if floor == nil {
 		return nil, errors.New("フロアが見つかりません")
 	}
 
-	// マップを取得して所有者を確認
-	mapObj, err := s.mapRepo.GetByID(ctx, floor.MapID)
+	// マップの所有者を確認
+	map_, err := s.mapRepo.GetByID(ctx, floor.MapID)
 	if err != nil {
 		return nil, err
 	}
-
-	if mapObj == nil {
-		return nil, errors.New("マップが見つかりません")
-	}
-
-	if mapObj.UserID != userID && !mapObj.IsPubliclyEditable {
-		return nil, errors.New("このマップにピンを追加する権限がありません")
-	}
-
-	// 新しいピンを作成
-	pin := &models.Pin{
-		FloorID:        req.FloorID,
-		Title:          req.Title,
-		Description:    req.Description,
-		XPosition:      req.XPosition,
-		YPosition:      req.YPosition,
-		ImageURL:       req.ImageURL,
-		EditorID:       req.EditorID,
-		EditorNickname: req.EditorNickname,
-	}
-
-	// 編集者情報が指定されていない場合、ユーザー情報を使用
-	if pin.EditorID == "" {
-		pin.EditorID = userID
-	}
-
-	if err := s.pinRepo.Create(ctx, pin); err != nil {
-		return nil, err
-	}
-
-	return pin, nil
-}
-
-// GetPinsByFloorID はフロアに属するすべてのピンを取得する
-func (s *PinServiceImpl) GetPinsByFloorID(ctx context.Context, floorID string) ([]*models.Pin, error) {
-	// フロアIDを使用してピンを取得
-	return s.pinRepo.GetByFloorID(ctx, floorID)
-}
-
-// GetPinByID はIDによりピンを取得する
-func (s *PinServiceImpl) GetPinByID(ctx context.Context, id string) (*models.Pin, error) {
-	return s.pinRepo.GetByID(ctx, id)
-}
-
-// CreatePin は新しいピンを作成する
-func (s *PinServiceImpl) CreatePin(ctx context.Context, req models.PinCreate, userID string) (*models.Pin, error) {
-	// フロアを取得
-	floor, err := s.floorRepo.GetByID(ctx, req.FloorID)
-	if err != nil {
-		return nil, err
-	}
-
-	if floor == nil {
-		return nil, errors.New("フロアが見つかりません")
-	}
-
-	// マップを取得して所有者を確認
-	mapObj, err := s.mapRepo.GetByID(ctx, floor.MapID)
-	if err != nil {
-		return nil, err
-	}
-
-	if mapObj == nil {
-		return nil, errors.New("マップが見つかりません")
-	}
-
-	if mapObj.UserID != userID && !mapObj.IsPubliclyEditable {
-		return nil, errors.New("このマップにピンを追加する権限がありません")
-	}
-
-	// 新しいピンを作成
-	pin := &models.Pin{
-		FloorID:        req.FloorID,
-		Title:          req.Title,
-		Description:    req.Description,
-		XPosition:      req.XPosition,
-		YPosition:      req.YPosition,
-		ImageURL:       req.ImageURL,
-		EditorID:       req.EditorID,
-		EditorNickname: req.EditorNickname,
-	}
-
-	// 編集者情報が指定されていない場合、ユーザー情報を使用
-	if pin.EditorID == "" {
-		pin.EditorID = userID
-	}
-
-	if err := s.pinRepo.Create(ctx, pin); err != nil {
-		return nil, err
-	}
-
-	return pin, nil
-}
-
-// GetPinsByFloorID はフロアに属するすべてのピンを取得する
-func (s *PinServiceImpl) GetPinsByFloorID(ctx context.Context, floorID string) ([]*models.Pin, error) {
-	// フロアIDを使用してピンを取得
-	return s.pinRepo.GetByFloorID(ctx, floorID)
-}
-
-// GetPinByID はIDによりピンを取得する
-func (s *PinServiceImpl) GetPinByID(ctx context.Context, id string) (*models.Pin, error) {
-	return s.pinRepo.GetByID(ctx, id)
-}
-
-// UpdatePin はピン情報を更新する
-func (s *PinServiceImpl) UpdatePin(ctx context.Context, id string, req models.PinUpdate, userID string) (*models.Pin, error) {
-	// ピンを取得
-	pin, err := s.pinRepo.GetByID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	if pin == nil {
-		return nil, errors.New("ピンが見つかりません")
-	}
-
-	// フロアを取得
-	floor, err := s.floorRepo.GetByID(ctx, pin.FloorID)
-	if err != nil {
-		return nil, err
-	}
-
-	if floor == nil {
-		return nil, errors.New("フロアが見つかりません")
-	}
-
-	// マップを取得して所有者を確認
-	mapObj, err := s.mapRepo.GetByID(ctx, floor.MapID)
-	if err != nil {
-		return nil, err
-	}
-
-	if mapObj == nil {
+	if map_ == nil {
 		return nil, errors.New("マップが見つかりません")
 	}
 
 	// 権限チェック
-	isOwner := mapObj.UserID == userID
-	isEditor := pin.EditorID == userID
-	isPubliclyEditable := mapObj.IsPubliclyEditable
+	if map_.UserID != userID {
+		return nil, errors.New("このマップを編集する権限がありません")
+	}
 
-	if !isOwner && !isEditor && !isPubliclyEditable {
+	// 新しいピンを作成
+	pin := &models.Pin{
+		ID:             uuid.New().String(),
+		FloorID:        input.FloorID,
+		Title:          input.Title,
+		Description:    input.Description,
+		XPosition:      input.XPosition,
+		YPosition:      input.YPosition,
+		ImageURL:       input.ImageURL,
+		CreatedAt:      time.Now(),
+		UpdatedAt:      time.Now(),
+		EditorID:       userID,
+		EditorNickname: "管理者", // 管理者によるピン作成
+	}
+
+	// リポジトリに保存
+	if err := s.pinRepo.Create(ctx, pin); err != nil {
+		return nil, err
+	}
+
+	return pin, nil
+}
+
+// CreatePublic は公開編集用の新しいピンを作成する
+func (s *DefaultPinService) CreatePublic(ctx context.Context, input *models.PinCreate) (*models.Pin, error) {
+	// フロアが存在するか確認
+	floor, err := s.floorRepo.GetByID(ctx, input.FloorID)
+	if err != nil {
+		return nil, err
+	}
+	if floor == nil {
+		return nil, errors.New("フロアが見つかりません")
+	}
+
+	// マップが公開編集可能か確認
+	map_, err := s.mapRepo.GetByID(ctx, floor.MapID)
+	if err != nil {
+		return nil, err
+	}
+	if map_ == nil {
+		return nil, errors.New("マップが見つかりません")
+	}
+
+	if !map_.IsPubliclyEditable {
+		return nil, errors.New("このマップは公開編集が許可されていません")
+	}
+
+	// 編集者情報のチェック
+	if input.EditorID == "" || input.EditorNickname == "" {
+		return nil, errors.New("編集者情報が必要です")
+	}
+
+	// 新しいピンを作成
+	pin := &models.Pin{
+		ID:             uuid.New().String(),
+		FloorID:        input.FloorID,
+		Title:          input.Title,
+		Description:    input.Description,
+		XPosition:      input.XPosition,
+		YPosition:      input.YPosition,
+		ImageURL:       input.ImageURL,
+		EditorID:       input.EditorID,
+		EditorNickname: input.EditorNickname,
+		CreatedAt:      time.Now(),
+		UpdatedAt:      time.Now(),
+	}
+
+	// リポジトリに保存
+	if err := s.pinRepo.Create(ctx, pin); err != nil {
+		return nil, err
+	}
+
+	return pin, nil
+}
+
+// GetByID はIDによりピンを取得する
+func (s *DefaultPinService) GetByID(ctx context.Context, id string) (*models.Pin, error) {
+	return s.pinRepo.GetByID(ctx, id)
+}
+
+// GetByFloorID はフロアIDによりピンを取得する
+func (s *DefaultPinService) GetByFloorID(ctx context.Context, floorID string) ([]*models.Pin, error) {
+	return s.pinRepo.GetByFloorID(ctx, floorID)
+}
+
+// GetByFloorIDs は複数のフロアIDに対応するピンを取得する
+func (s *DefaultPinService) GetByFloorIDs(ctx context.Context, floorIDs []string) ([]*models.Pin, error) {
+	return s.pinRepo.GetByFloorIDs(ctx, floorIDs)
+}
+
+// Update はピン情報を更新する
+func (s *DefaultPinService) Update(ctx context.Context, userID string, id string, input *models.PinUpdate) (*models.Pin, error) {
+	// ピンが存在するか確認
+	pin, err := s.pinRepo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if pin == nil {
+		return nil, errors.New("ピンが見つかりません")
+	}
+
+	// フロアが存在するか確認
+	floor, err := s.floorRepo.GetByID(ctx, pin.FloorID)
+	if err != nil {
+		return nil, err
+	}
+	if floor == nil {
+		return nil, errors.New("フロアが見つかりません")
+	}
+
+	// マップの所有者を確認
+	map_, err := s.mapRepo.GetByID(ctx, floor.MapID)
+	if err != nil {
+		return nil, err
+	}
+	if map_ == nil {
+		return nil, errors.New("マップが見つかりません")
+	}
+
+	// 権限チェック
+	if map_.UserID != userID {
 		return nil, errors.New("このピンを編集する権限がありません")
 	}
 
 	// ピン情報を更新
-	if req.Title != "" {
-		pin.Title = req.Title
+	if input.Title != "" {
+		pin.Title = input.Title
 	}
-
-	if req.Description != "" {
-		pin.Description = req.Description
+	if input.Description != "" {
+		pin.Description = input.Description
 	}
-
-	if req.ImageURL != "" {
-		pin.ImageURL = req.ImageURL
+	if input.ImageURL != "" {
+		pin.ImageURL = input.ImageURL
 	}
+	pin.UpdatedAt = time.Now()
 
+	// リポジトリを更新
 	if err := s.pinRepo.Update(ctx, pin); err != nil {
 		return nil, err
 	}
@@ -229,43 +213,95 @@ func (s *PinServiceImpl) UpdatePin(ctx context.Context, id string, req models.Pi
 	return pin, nil
 }
 
-// DeletePin はピンを削除する
-func (s *PinServiceImpl) DeletePin(ctx context.Context, id string, userID string) error {
-	// ピンを取得
+// UpdatePublic は公開編集用のピン情報を更新する
+func (s *DefaultPinService) UpdatePublic(ctx context.Context, editorID string, id string, input *models.PinUpdate) (*models.Pin, error) {
+	// ピンが存在するか確認
+	pin, err := s.pinRepo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if pin == nil {
+		return nil, errors.New("ピンが見つかりません")
+	}
+
+	// 編集者IDを確認
+	if pin.EditorID != editorID {
+		return nil, errors.New("このピンを編集する権限がありません")
+	}
+
+	// フロアが存在するか確認
+	floor, err := s.floorRepo.GetByID(ctx, pin.FloorID)
+	if err != nil {
+		return nil, err
+	}
+	if floor == nil {
+		return nil, errors.New("フロアが見つかりません")
+	}
+
+	// マップが公開編集可能か確認
+	map_, err := s.mapRepo.GetByID(ctx, floor.MapID)
+	if err != nil {
+		return nil, err
+	}
+	if map_ == nil {
+		return nil, errors.New("マップが見つかりません")
+	}
+
+	if !map_.IsPubliclyEditable {
+		return nil, errors.New("このマップは公開編集が許可されていません")
+	}
+
+	// ピン情報を更新
+	if input.Title != "" {
+		pin.Title = input.Title
+	}
+	if input.Description != "" {
+		pin.Description = input.Description
+	}
+	if input.ImageURL != "" {
+		pin.ImageURL = input.ImageURL
+	}
+	pin.UpdatedAt = time.Now()
+
+	// リポジトリを更新
+	if err := s.pinRepo.Update(ctx, pin); err != nil {
+		return nil, err
+	}
+
+	return pin, nil
+}
+
+// Delete はピンを削除する
+func (s *DefaultPinService) Delete(ctx context.Context, userID string, id string) error {
+	// ピンが存在するか確認
 	pin, err := s.pinRepo.GetByID(ctx, id)
 	if err != nil {
 		return err
 	}
-
 	if pin == nil {
 		return errors.New("ピンが見つかりません")
 	}
 
-	// フロアを取得
+	// フロアが存在するか確認
 	floor, err := s.floorRepo.GetByID(ctx, pin.FloorID)
 	if err != nil {
 		return err
 	}
-
 	if floor == nil {
 		return errors.New("フロアが見つかりません")
 	}
 
-	// マップを取得して所有者を確認
-	mapObj, err := s.mapRepo.GetByID(ctx, floor.MapID)
+	// マップの所有者を確認
+	map_, err := s.mapRepo.GetByID(ctx, floor.MapID)
 	if err != nil {
 		return err
 	}
-
-	if mapObj == nil {
+	if map_ == nil {
 		return errors.New("マップが見つかりません")
 	}
 
 	// 権限チェック
-	isOwner := mapObj.UserID == userID
-	isEditor := pin.EditorID == userID
-	
-	if !isOwner && !isEditor {
+	if map_.UserID != userID {
 		return errors.New("このピンを削除する権限がありません")
 	}
 
@@ -273,59 +309,44 @@ func (s *PinServiceImpl) DeletePin(ctx context.Context, id string, userID string
 	return s.pinRepo.Delete(ctx, id)
 }
 
-// UploadPinImage はピンの画像をアップロードする
-func (s *PinServiceImpl) UploadPinImage(ctx context.Context, pinID string, userID string, file io.Reader) (string, error) {
-	// ピンを取得
-	pin, err := s.pinRepo.GetByID(ctx, pinID)
+// DeletePublic は公開編集用のピンを削除する
+func (s *DefaultPinService) DeletePublic(ctx context.Context, editorID string, id string) error {
+	// ピンが存在するか確認
+	pin, err := s.pinRepo.GetByID(ctx, id)
 	if err != nil {
-		return "", err
+		return err
 	}
-
 	if pin == nil {
-		return "", errors.New("ピンが見つかりません")
+		return errors.New("ピンが見つかりません")
 	}
 
-	// フロアを取得
+	// 編集者IDを確認
+	if pin.EditorID != editorID {
+		return errors.New("このピンを削除する権限がありません")
+	}
+
+	// フロアが存在するか確認
 	floor, err := s.floorRepo.GetByID(ctx, pin.FloorID)
 	if err != nil {
-		return "", err
+		return err
 	}
-
 	if floor == nil {
-		return "", errors.New("フロアが見つかりません")
+		return errors.New("フロアが見つかりません")
 	}
 
-	// マップを取得して所有者を確認
-	mapObj, err := s.mapRepo.GetByID(ctx, floor.MapID)
+	// マップが公開編集可能か確認
+	map_, err := s.mapRepo.GetByID(ctx, floor.MapID)
 	if err != nil {
-		return "", err
+		return err
+	}
+	if map_ == nil {
+		return errors.New("マップが見つかりません")
 	}
 
-	if mapObj == nil {
-		return "", errors.New("マップが見つかりません")
+	if !map_.IsPubliclyEditable {
+		return errors.New("このマップは公開編集が許可されていません")
 	}
 
-	// 権限チェック
-	isOwner := mapObj.UserID == userID
-	isEditor := pin.EditorID == userID
-	isPubliclyEditable := mapObj.IsPubliclyEditable
-
-	if !isOwner && !isEditor && !isPubliclyEditable {
-		return "", errors.New("このピンを編集する権限がありません")
-	}
-
-	// Cloudinaryにアップロード
-	uploadResult, err := s.cloudinary.Upload.Upload(ctx, file, uploader.UploadParams{
-		Folder:         "pin_images",
-		Format:         "webp",
-		Transformation: "q_auto",
-		ResourceType:   "image",
-		PublicID:       fmt.Sprintf("pin_%s", pinID),
-	})
-
-	if err != nil {
-		return "", err
-	}
-
-	return uploadResult.SecureURL, nil
+	// ピンを削除
+	return s.pinRepo.Delete(ctx, id)
 }

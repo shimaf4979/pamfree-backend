@@ -4,13 +4,10 @@ package services
 import (
 	"context"
 	"errors"
-	"fmt"
-	"io"
 
-	"github.com/cloudinary/cloudinary-go/v2"
-	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
-	"github.com/yourname/mapapp/models"
-	"github.com/yourname/mapapp/repositories"
+	"github.com/google/uuid"
+	"github.com/shimaf4979/pamfree-backend/models"
+	"github.com/shimaf4979/pamfree-backend/repositories"
 )
 
 // FloorService はフロア関連のビジネスロジックを提供するインターフェース
@@ -20,26 +17,22 @@ type FloorService interface {
 	GetFloorByID(ctx context.Context, id string) (*models.Floor, error)
 	UpdateFloor(ctx context.Context, id string, req models.FloorUpdate, userID string) (*models.Floor, error)
 	DeleteFloor(ctx context.Context, id string, userID string) error
-	UploadFloorImage(ctx context.Context, floorID string, userID string, file io.Reader) (string, error)
 }
 
 // FloorServiceImpl はFloorServiceの実装
 type FloorServiceImpl struct {
-	floorRepo  repositories.FloorRepository
-	mapRepo    repositories.MapRepository
-	cloudinary *cloudinary.Cloudinary
+	floorRepo repositories.FloorRepository
+	mapRepo   repositories.MapRepository
 }
 
 // NewFloorService は新しいFloorServiceを作成する
 func NewFloorService(
 	floorRepo repositories.FloorRepository,
 	mapRepo repositories.MapRepository,
-	cloudinary *cloudinary.Cloudinary,
 ) FloorService {
 	return &FloorServiceImpl{
-		floorRepo:  floorRepo,
-		mapRepo:    mapRepo,
-		cloudinary: cloudinary,
+		floorRepo: floorRepo,
+		mapRepo:   mapRepo,
 	}
 }
 
@@ -61,6 +54,7 @@ func (s *FloorServiceImpl) CreateFloor(ctx context.Context, req models.FloorCrea
 
 	// 新しいフロアを作成
 	floor := &models.Floor{
+		ID:          uuid.New().String(),
 		MapID:       req.MapID,
 		FloorNumber: req.FloorNumber,
 		Name:        req.Name,
@@ -75,8 +69,18 @@ func (s *FloorServiceImpl) CreateFloor(ctx context.Context, req models.FloorCrea
 
 // GetFloorsByMapID はマップに属するすべてのフロアを取得する
 func (s *FloorServiceImpl) GetFloorsByMapID(ctx context.Context, mapID string) ([]*models.Floor, error) {
+	// まずマップIDからマップを取得
+	mapObj, err := s.mapRepo.GetByMapID(ctx, mapID)
+	if err != nil {
+		return nil, err
+	}
+
+	if mapObj == nil {
+		return nil, errors.New("マップが見つかりません")
+	}
+
 	// マップIDを使用してフロアを取得
-	return s.floorRepo.GetByMapID(ctx, mapID)
+	return s.floorRepo.GetByMapID(ctx, mapObj.ID)
 }
 
 // GetFloorByID はIDによりフロアを取得する
@@ -148,52 +152,13 @@ func (s *FloorServiceImpl) DeleteFloor(ctx context.Context, id string, userID st
 		return errors.New("マップが見つかりません")
 	}
 
+	// 所有者または管理者の場合のみ削除可能
 	if mapObj.UserID != userID {
+		// userのロールを取得（この部分は必要に応じて実装）
+		// ここではシンプルにするため、所有者チェックのみ行う
 		return errors.New("このフロアを削除する権限がありません")
 	}
 
 	// フロアを削除
 	return s.floorRepo.Delete(ctx, id)
-}
-
-// UploadFloorImage はフロアの画像をアップロードする
-func (s *FloorServiceImpl) UploadFloorImage(ctx context.Context, floorID string, userID string, file io.Reader) (string, error) {
-	// フロアを取得
-	floor, err := s.floorRepo.GetByID(ctx, floorID)
-	if err != nil {
-		return "", err
-	}
-
-	if floor == nil {
-		return "", errors.New("フロアが見つかりません")
-	}
-
-	// マップを取得して所有者を確認
-	mapObj, err := s.mapRepo.GetByID(ctx, floor.MapID)
-	if err != nil {
-		return "", err
-	}
-
-	if mapObj == nil {
-		return "", errors.New("マップが見つかりません")
-	}
-
-	if mapObj.UserID != userID {
-		return "", errors.New("このフロアを編集する権限がありません")
-	}
-
-	// Cloudinaryにアップロード
-	uploadResult, err := s.cloudinary.Upload.Upload(ctx, file, uploader.UploadParams{
-		Folder:         "map_images",
-		Format:         "webp",
-		Transformation: "q_auto",
-		ResourceType:   "image",
-		PublicID:       fmt.Sprintf("%s_%s", mapObj.MapID, floorID),
-	})
-
-	if err != nil {
-		return "", err
-	}
-
-	return uploadResult.SecureURL, nil
 }

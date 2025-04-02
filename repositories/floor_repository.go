@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/yourname/mapapp/models"
+	"github.com/shimaf4979/pamfree-backend/models"
 )
 
 // FloorRepository はフロアデータへのアクセスを提供するインターフェース

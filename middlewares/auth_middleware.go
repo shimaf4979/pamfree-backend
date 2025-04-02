@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/yourname/mapapp/utils"
+	"github.com/shimaf4979/pamfree-backend/utils"
 )
 
 // AuthMiddleware は認証を検証するミドルウェア

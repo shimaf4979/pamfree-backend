@@ -6,7 +6,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/yourname/mapapp/models"
+	"github.com/shimaf4979/pamfree-backend/models"
 )
 
 // MapRepository マップデータへのアクセスを提供するインターフェース

@@ -6,17 +6,17 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/yourname/mapapp/models"
-	"github.com/yourname/mapapp/services"
+	"github.com/shimaf4979/pamfree-backend/models"
+	"github.com/shimaf4979/pamfree-backend/services"
 )
 
 // MapController マップコントローラー
 type MapController struct {
-	mapService *services.MapService
+	mapService services.MapService
 }
 
 // NewMapController 新しいマップコントローラーを作成
-func NewMapController(mapService *services.MapService) *MapController {
+func NewMapController(mapService services.MapService) *MapController {
 	return &MapController{
 		mapService: mapService,
 	}

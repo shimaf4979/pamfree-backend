@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/yourname/mapapp/models"
-	"github.com/yourname/mapapp/services"
+	"github.com/shimaf4979/pamfree-backend/models"
+	"github.com/shimaf4979/pamfree-backend/services"
 )
 
 // FloorController はフロア関連のAPIエンドポイントを管理する
@@ -60,6 +60,24 @@ func (c *FloorController) GetFloors(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, floors)
 }
 
+// GetFloorByID はIDによりフロアを取得する
+func (c *FloorController) GetFloorByID(ctx *gin.Context) {
+	floorID := ctx.Param("floorId")
+
+	floor, err := c.floorService.GetFloorByID(ctx, floorID)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if floor == nil {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "フロアが見つかりません"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, floor)
+}
+
 // UpdateFloorImage はフロアの画像を更新する
 func (c *FloorController) UpdateFloorImage(ctx *gin.Context) {
 	floorID := ctx.Param("floorId")
@@ -69,32 +87,22 @@ func (c *FloorController) UpdateFloorImage(ctx *gin.Context) {
 		return
 	}
 
-	// マルチパートフォームからファイルを取得
-	file, err := ctx.FormFile("image")
-	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "画像ファイルが必要です"})
-		return
+	// Cloudinaryにアップロード済みの画像URLを取得
+	var req struct {
+		ImageURL string `json:"image_url" binding:"required"`
 	}
 
-	// ファイルを開く
-	src, err := file.Open()
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "ファイルの読み込みに失敗しました"})
-		return
-	}
-	defer src.Close()
-
-	// Cloudinaryにアップロード
-	imageURL, err := c.floorService.UploadFloorImage(ctx, floorID, userID.(string), src)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "画像URLが必要です"})
 		return
 	}
 
 	// フロア情報を更新
-	floor, err := c.floorService.UpdateFloor(ctx, floorID, models.FloorUpdate{
-		ImageURL: imageURL,
-	}, userID.(string))
+	update := models.FloorUpdate{
+		ImageURL: req.ImageURL,
+	}
+
+	floor, err := c.floorService.UpdateFloor(ctx, floorID, update, userID.(string))
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

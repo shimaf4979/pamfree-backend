@@ -3,39 +3,25 @@ package routes
 
 import (
 	"database/sql"
+	"log"
+	"time"
 
-	"github.com/cloudinary/cloudinary-go/v2"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/yourname/mapapp/config"
-	"github.com/yourname/mapapp/controllers"
-	"github.com/yourname/mapapp/middlewares"
-	"github.com/yourname/mapapp/repositories"
-	"github.com/yourname/mapapp/services"
+	"github.com/shimaf4979/pamfree-backend/config"
+	"github.com/shimaf4979/pamfree-backend/controllers"
+	"github.com/shimaf4979/pamfree-backend/middlewares"
+	"github.com/shimaf4979/pamfree-backend/repositories"
+	"github.com/shimaf4979/pamfree-backend/services"
 )
 
-// SetupRoutes はルートの設定を行う
+// SetupRoutes はアプリケーションのルートを設定する
 func SetupRoutes(router *gin.Engine, cfg *config.Config) {
 	// データベース接続
-	dsn := getDSN(cfg)
-	db, err := sql.Open("mysql", dsn)
+	db, err := setupDatabase(cfg)
 	if err != nil {
-		panic("データベース接続に失敗しました: " + err.Error())
-	}
-
-	if err := db.Ping(); err != nil {
-		panic("データベース接続の確認に失敗しました: " + err.Error())
-	}
-
-	// Cloudinaryの初期化
-	cld, err := cloudinary.NewFromParams(
-		cfg.CloudinaryName,
-		cfg.CloudinaryKey,
-		cfg.CloudinarySecret,
-	)
-	if err != nil {
-		panic("Cloudinaryの初期化に失敗しました: " + err.Error())
+		log.Fatalf("データベース接続エラー: %v", err)
 	}
 
 	// リポジトリの初期化
@@ -46,105 +32,159 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config) {
 	publicEditorRepo := repositories.NewMySQLPublicEditorRepository(db)
 
 	// サービスの初期化
-	authService := services.NewAuthService(userRepo, cfg.JWTSecret)
+	authService := services.NewAuthService(userRepo)
 	mapService := services.NewMapService(mapRepo)
-	floorService := services.NewFloorService(floorRepo, mapRepo, cld)
-	pinService := services.NewPinService(pinRepo, floorRepo, mapRepo, cld)
+	floorService := services.NewFloorService(floorRepo, mapRepo)
+	pinService := services.NewPinService(pinRepo, floorRepo, mapRepo)
 	publicEditorService := services.NewPublicEditorService(publicEditorRepo, mapRepo)
-	viewerService := services.NewViewerService(mapRepo, floorRepo, pinRepo)
 
 	// コントローラーの初期化
-	authController := controllers.NewAuthController(authService)
+	authController := controllers.NewAuthController(authService, cfg.JWTSecret)
 	mapController := controllers.NewMapController(mapService)
 	floorController := controllers.NewFloorController(floorService)
 	pinController := controllers.NewPinController(pinService)
-	publicEditorController := controllers.NewPublicEditorController(publicEditorService)
-	viewerController := controllers.NewViewerController(viewerService)
+	publicEditorController := controllers.NewPublicEditorController(publicEditorService, mapService)
+	viewerController := controllers.NewViewerController(mapService, floorService, pinService)
 
-	// CORSミドルウェア
-	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"*"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
-	}))
+	// Cloudinaryコントローラー
+	cloudinaryController, err := controllers.NewCloudinaryController(cfg)
+	if err != nil {
+		log.Fatalf("Cloudinaryコントローラーの初期化に失敗しました: %v", err)
+	}
+
+	// CORSミドルウェアを設定
+	corsConfig := cors.Config{
+		AllowOrigins:     []string{cfg.AllowedOrigins},
+		AllowMethods:     cfg.AllowedMethods,
+		AllowHeaders:     cfg.AllowedHeaders,
+		ExposeHeaders:    cfg.ExposedHeaders,
+		AllowCredentials: cfg.AllowCredentials,
+		MaxAge:           time.Duration(cfg.MaxAge) * time.Second,
+	}
+	router.Use(cors.New(corsConfig))
 
 	// 認証ミドルウェア
 	authMiddleware := middlewares.AuthMiddleware(cfg.JWTSecret)
 	adminMiddleware := middlewares.AdminMiddleware()
 
-	// 認証関連のルート
-	auth := router.Group("/auth")
+	// ヘルスチェック
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok"})
+	})
+
+	// 認証ルート
+	auth := router.Group("/api/auth")
 	{
 		auth.POST("/register", authController.Register)
 		auth.POST("/login", authController.Login)
+		auth.GET("/me", authMiddleware, authController.GetMe)
 	}
 
-	// マップ関連のルート
-	maps := router.Group("/maps")
-	maps.Use(authMiddleware)
+	// マップルート
+	maps := router.Group("/api/maps")
 	{
-		maps.GET("", mapController.GetMaps)
-		maps.POST("", mapController.CreateMap)
-		maps.GET("/:mapId", mapController.GetMap)
-		maps.PATCH("/:mapId", mapController.UpdateMap)
-		maps.DELETE("/:mapId", mapController.DeleteMap)
+		maps.GET("", authMiddleware, mapController.GetMaps)
+		maps.POST("", authMiddleware, mapController.CreateMap)
+		maps.GET("/:mapId", authMiddleware, mapController.GetMapByID)
+		maps.PATCH("/:mapId", authMiddleware, mapController.UpdateMap)
+		maps.DELETE("/:mapId", authMiddleware, mapController.DeleteMap)
 
-		// フロア関連のルート
+		// フロアルート (マップIDによる)
 		maps.GET("/:mapId/floors", floorController.GetFloors)
-		maps.POST("/:mapId/floors", floorController.CreateFloor)
+		maps.POST("/:mapId/floors", authMiddleware, floorController.CreateFloor)
 	}
 
-	// フロア関連のルート
-	floors := router.Group("/floors")
-	floors.Use(authMiddleware)
+	// map_idによるマップ操作ルート
+	router.GET("/api/maps/by-map-id/:mapId", mapController.GetMapByMapID)
+	router.DELETE("/api/maps/by-map-id/:mapId", authMiddleware, mapController.DeleteMapByMapID)
+
+	// フロアルート
+	floors := router.Group("/api/floors")
 	{
-		floors.PATCH("/:floorId", floorController.UpdateFloor)
-		floors.DELETE("/:floorId", floorController.DeleteFloor)
-		floors.POST("/:floorId/image", floorController.UpdateFloorImage)
+		floors.GET("/:floorId", floorController.GetFloorByID)
+		floors.PATCH("/:floorId", authMiddleware, floorController.UpdateFloor)
+		floors.DELETE("/:floorId", authMiddleware, floorController.DeleteFloor)
 
-		// ピン関連のルート
-		floors.GET("/:floorId/pins", pinController.GetPins)
-		floors.POST("/:floorId/pins", pinController.CreatePin)
+		// ピンルート (フロアIDによる)
+		floors.GET("/:floorId/pins", pinController.GetPinsByFloorID)
+		floors.POST("/:floorId/pins", authMiddleware, pinController.CreatePin)
+
+		// フロア画像アップロード
+		floors.POST("/:floorId/image", authMiddleware, floorController.UpdateFloorImage)
 	}
 
-	// ピン関連のルート
-	pins := router.Group("/pins")
-	pins.Use(authMiddleware)
+	// ピンルート
+	pins := router.Group("/api/pins")
 	{
-		pins.PATCH("/:pinId", pinController.UpdatePin)
-		pins.DELETE("/:pinId", pinController.DeletePin)
-		pins.POST("/:pinId/image", pinController.UpdatePinImage)
+		pins.GET("/:pinId", pinController.GetPinByID)
+		pins.PATCH("/:pinId", authMiddleware, pinController.UpdatePin)
+		pins.DELETE("/:pinId", authMiddleware, pinController.DeletePin)
+
+		// ピン画像アップロード
+		pins.POST("/:pinId/image", authMiddleware, pinController.UpdatePinImage)
 	}
 
-	// 管理者用ルート
-	admin := router.Group("/admin")
-	admin.Use(authMiddleware, adminMiddleware)
+	// 公開編集ルート
+	publicEdit := router.Group("/api/public-edit")
 	{
-		admin.GET("/users", authController.GetUsers)
-		admin.PATCH("/users/:userId", authController.UpdateUser)
-		admin.DELETE("/users/:userId", authController.DeleteUser)
+		publicEdit.POST("/register", publicEditorController.Register)
+		publicEdit.POST("/verify", publicEditorController.Verify)
+
+		// 公開編集用のピン操作
+		publicEdit.POST("/pins", pinController.CreatePublicPin)
+		publicEdit.PATCH("/pins/:pinId", pinController.UpdatePublicPin)
+		publicEdit.DELETE("/pins/:pinId", pinController.DeletePublicPin)
 	}
 
-	// 公開閲覧用ルート
-	viewer := router.Group("/viewer")
+	// ビューワールート
+	viewer := router.Group("/api/viewer")
 	{
 		viewer.GET("/:mapId", viewerController.GetMapData)
 	}
 
-	// 公開編集用ルート
-	publicEdit := router.Group("/public-edit")
+	// Cloudinaryルート
+	cloudinary := router.Group("/api/cloudinary", authMiddleware)
 	{
-		publicEdit.POST("/register", publicEditorController.Register)
-		publicEdit.POST("/verify", publicEditorController.VerifyToken)
-		publicEdit.POST("/pins", publicEditorController.CreatePin)
-		publicEdit.PATCH("/pins/:pinId", publicEditorController.UpdatePin)
-		publicEdit.DELETE("/pins/:pinId", publicEditorController.DeletePin)
+		cloudinary.POST("/upload", cloudinaryController.UploadImage)
+		cloudinary.POST("/delete", cloudinaryController.DeleteImage)
+	}
+
+	// アカウント管理ルート
+	account := router.Group("/api/account", authMiddleware)
+	{
+		account.PATCH("/update-profile", authController.UpdateProfile)
+		account.POST("/change-password", authController.ChangePassword)
+	}
+
+	// 管理者ルート
+	admin := router.Group("/api/admin", authMiddleware, adminMiddleware)
+	{
+		admin.GET("/users", authController.GetAllUsers)
+		admin.PATCH("/users/:userId", authController.UpdateUser)
+		admin.DELETE("/users/:userId", authController.DeleteUser)
 	}
 }
 
-// getDSN はデータベース接続文字列を生成する
-func getDSN(cfg *config.Config) string {
-	return cfg.DBUser + ":" + cfg.DBPassword + "@tcp(" + cfg.DBHost + ":" + cfg.DBPort + ")/" + cfg.DBName + "?parseTime=true"
+// setupDatabase はデータベース接続を設定する
+func setupDatabase(cfg *config.Config) (*sql.DB, error) {
+	// データソース名を構築
+	dsn := cfg.DBUser + ":" + cfg.DBPassword + "@tcp(" + cfg.DBHost + ":" + cfg.DBPort + ")/" + cfg.DBName + "?charset=utf8mb4&parseTime=True&loc=Local"
+
+	// データベース接続を開く
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		return nil, err
+	}
+
+	// 接続をテスト
+	if err := db.Ping(); err != nil {
+		return nil, err
+	}
+
+	// 接続プールの設定
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(5 * time.Minute)
+
+	return db, nil
 }

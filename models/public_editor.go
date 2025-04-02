@@ -21,16 +21,33 @@ type PublicEditorRegister struct {
 	Nickname string `json:"nickname" binding:"required"`
 }
 
-// PublicEditorVerify は公開編集者トークン検証リクエストを表す構造体
+// PublicEditorVerify は公開編集者検証リクエストを表す構造体
 type PublicEditorVerify struct {
 	EditorID string `json:"editorId" binding:"required"`
 	Token    string `json:"token" binding:"required"`
 }
 
-// PublicEditorResponse は公開編集者のレスポンスを表す構造体
+// PublicEditorResponse は公開編集者登録レスポンスを表す構造体
 type PublicEditorResponse struct {
-	ID       string `json:"editorId"`
+	EditorID string `json:"editorId"`
 	Nickname string `json:"nickname"`
+	Token    string `json:"token,omitempty"` // 登録時のみトークンを含める
 	MapID    string `json:"mapId"`
-	Token    string `json:"token"`
+	Verified bool   `json:"verified"`
+}
+
+// ToResponse は公開編集者モデルからレスポンスモデルに変換する
+func (e *PublicEditor) ToResponse(includeToken bool) PublicEditorResponse {
+	response := PublicEditorResponse{
+		EditorID: e.ID,
+		Nickname: e.Nickname,
+		MapID:    e.MapID,
+		Verified: true,
+	}
+
+	if includeToken {
+		response.Token = e.EditorToken
+	}
+
+	return response
 }

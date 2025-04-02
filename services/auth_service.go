@@ -1,139 +1,60 @@
-// controllers/auth_controller.go
-package controllers
+// services/auth_service.go
+package services
 
 import (
-	"net/http"
+	"context"
 
-	"github.com/gin-gonic/gin"
-	"github.com/yourname/mapapp/models"
-	"github.com/yourname/mapapp/services"
-	"github.com/yourname/mapapp/utils"
+	"github.com/shimaf4979/pamfree-backend/models"
+	"github.com/shimaf4979/pamfree-backend/repositories"
 )
 
-// AuthController 認証コントローラー
-type AuthController struct {
-	authService *services.AuthService
-	jwtSecret   string
+// AuthService 認証サービス
+type AuthService struct {
+	userRepo repositories.UserRepository
 }
 
-// NewAuthController 新しい認証コントローラーを作成
-func NewAuthController(authService *services.AuthService, jwtSecret string) *AuthController {
-	return &AuthController{
-		authService: authService,
-		jwtSecret:   jwtSecret,
+// NewAuthService 新しい認証サービスを作成
+func NewAuthService(userRepo repositories.UserRepository) *AuthService {
+	return &AuthService{
+		userRepo: userRepo,
 	}
 }
 
-// Register ユーザー登録ハンドラー
-func (c *AuthController) Register(ctx *gin.Context) {
-	var req models.UserRegister
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "入力データが不正です"})
-		return
-	}
-
-	// メールアドレスの重複チェック
-	exists, err := c.authService.EmailExists(ctx, req.Email)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "サーバーエラーが発生しました"})
-		return
-	}
-	if exists {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "このメールアドレスは既に登録されています"})
-		return
-	}
-
-	// パスワードのハッシュ化
-	hashedPassword, err := utils.HashPassword(req.Password)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "パスワードの処理に失敗しました"})
-		return
-	}
-
-	// ユーザーの作成
-	user := &models.User{
-		Email:    req.Email,
-		Password: hashedPassword,
-		Name:     req.Name,
-		Role:     "user", // デフォルトは一般ユーザー
-	}
-
-	if err := c.authService.CreateUser(ctx, user); err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "ユーザーの登録に失敗しました"})
-		return
-	}
-
-	// レスポンスから機密情報を削除
-	userResponse := user.ToResponse()
-
-	ctx.JSON(http.StatusCreated, gin.H{
-		"message": "ユーザーが正常に登録されました",
-		"user":    userResponse,
-	})
+// CreateUser 新しいユーザーを作成
+func (s *AuthService) CreateUser(ctx context.Context, user *models.User) error {
+	return s.userRepo.Create(ctx, user)
 }
 
-// Login ログインハンドラー
-func (c *AuthController) Login(ctx *gin.Context) {
-	var req models.UserLogin
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "入力データが不正です"})
-		return
-	}
-
-	// メールアドレスからユーザーを検索
-	user, err := c.authService.GetUserByEmail(ctx, req.Email)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "サーバーエラーが発生しました"})
-		return
-	}
-	if user == nil {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "メールアドレスまたはパスワードが正しくありません"})
-		return
-	}
-
-	// パスワードの検証
-	if err := utils.CheckPassword(user.Password, req.Password); err != nil {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "メールアドレスまたはパスワードが正しくありません"})
-		return
-	}
-
-	// JWTトークンの生成
-	token, err := utils.GenerateToken(user.ID, user.Email, user.Role, c.jwtSecret)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "認証トークンの生成に失敗しました"})
-		return
-	}
-
-	// レスポンスから機密情報を削除
-	userResponse := user.ToResponse()
-
-	ctx.JSON(http.StatusOK, gin.H{
-		"token": token,
-		"user":  userResponse,
-	})
+// GetUserByID IDからユーザーを取得
+func (s *AuthService) GetUserByID(ctx context.Context, id string) (*models.User, error) {
+	return s.userRepo.GetByID(ctx, id)
 }
 
-// GetMe 現在のユーザー情報取得ハンドラー
-func (c *AuthController) GetMe(ctx *gin.Context) {
-	userID, exists := ctx.Get("userID")
-	if !exists {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "認証が必要です"})
-		return
-	}
+// GetUserByEmail メールアドレスからユーザーを取得
+func (s *AuthService) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
+	return s.userRepo.GetByEmail(ctx, email)
+}
 
-	// ユーザーIDからユーザーを検索
-	user, err := c.authService.GetUserByID(ctx, userID.(string))
+// EmailExists メールアドレスが既に存在するか確認
+func (s *AuthService) EmailExists(ctx context.Context, email string) (bool, error) {
+	user, err := s.userRepo.GetByEmail(ctx, email)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "サーバーエラーが発生しました"})
-		return
+		return false, err
 	}
-	if user == nil {
-		ctx.JSON(http.StatusNotFound, gin.H{"error": "ユーザーが見つかりません"})
-		return
-	}
+	return user != nil, nil
+}
 
-	// レスポンスから機密情報を削除
-	userResponse := user.ToResponse()
+// UpdateUser ユーザー情報を更新
+func (s *AuthService) UpdateUser(ctx context.Context, user *models.User) error {
+	return s.userRepo.Update(ctx, user)
+}
 
-	ctx.JSON(http.StatusOK, gin.H{"user": userResponse})
+// DeleteUser ユーザーを削除
+func (s *AuthService) DeleteUser(ctx context.Context, id string) error {
+	return s.userRepo.Delete(ctx, id)
+}
+
+// GetAllUsers すべてのユーザーを取得
+func (s *AuthService) GetAllUsers(ctx context.Context) ([]*models.User, error) {
+	return s.userRepo.GetAll(ctx)
 }
