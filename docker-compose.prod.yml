@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  api:
+    image: pamfree-api:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+      args:
+        - DOCKER_BUILDKIT=1
+        - GOGC=20
+      shm_size: '1gb'
+    container_name: pamfree-api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_PORT=8080
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT:-3306}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - JWT_SECRET=${JWT_SECRET}
+      - CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME}
+      - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY}
+      - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-*}
+      - UPLOAD_DIR=/app/uploads
+      - GIN_MODE=${GIN_MODE:-release}
+    volumes:
+      - uploads:/app/uploads
+    # t2.microのリソース制限に合わせて調整
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          memory: 200M
+    networks:
+      - pamfree_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  pamfree_network:
+    driver: bridge
+
+volumes:
+  uploads:
+    name: pamfree_uploads

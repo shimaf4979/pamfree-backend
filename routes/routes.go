@@ -23,6 +23,8 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config) {
 	if err != nil {
 		log.Fatalf("データベース接続エラー: %v", err)
 	}
+	log.Println("データベース接続成功")
+
 
 	// リポジトリの初期化
 	userRepo := repositories.NewMySQLUserRepository(db)

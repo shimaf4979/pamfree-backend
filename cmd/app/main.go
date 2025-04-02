@@ -12,6 +12,7 @@ import (
 
 func main() {
 	// 設定の読み込み
+	log.Println("設定の読み込み中...")
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		log.Fatalf("設定の読み込みに失敗しました: %v", err)
