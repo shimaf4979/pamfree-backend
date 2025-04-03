@@ -1,7 +1,5 @@
 .env
 .env.local
 
-go.sum
-go.mod
 
 .DS_Store
