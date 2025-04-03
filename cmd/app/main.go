@@ -20,7 +20,7 @@ func main() {
 
 	// Ginのモード設定
 	if cfg.Env == "production" {
-		gin.SetMode(gin.ReleaseMode)
+		gin.SetMode(gin.DebugMode)
 	} else {
 		gin.SetMode(gin.DebugMode)
 	}
