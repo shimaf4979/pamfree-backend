@@ -37,6 +37,7 @@ COPY --from=builder /app/app /app/app
 
 # 設定ファイルとスクリプトをコピー
 COPY docker-entrypoint.sh /usr/local/bin/
+COPY .env /app/.env
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # アップロードディレクトリ構造を作成して権限を設定

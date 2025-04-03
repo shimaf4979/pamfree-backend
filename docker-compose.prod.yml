@@ -11,7 +11,7 @@ services:
         - GOGC=20
       shm_size: '1gb'
     container_name: pamfree-api
-    restart: unless-stopped
+    restart: on-failure:5
     ports:
       - "8080:8080"
     environment:
