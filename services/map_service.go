@@ -13,8 +13,6 @@ import (
 type MapService interface {
 	GetMapsByUserID(ctx context.Context, userID string) ([]*models.Map, error)
 	GetMapByID(ctx context.Context, id string) (*models.Map, error)
-	GetMapByMapID(ctx context.Context, mapID string) (*models.Map, error)
-	MapIDExists(ctx context.Context, mapID string) (bool, error)
 	CreateMap(ctx context.Context, m *models.Map) error
 	UpdateMap(ctx context.Context, m *models.Map) error
 	DeleteMap(ctx context.Context, id string) error
@@ -42,29 +40,15 @@ func (s *DefaultMapService) GetMapByID(ctx context.Context, id string) (*models.
 	return s.mapRepo.GetByID(ctx, id)
 }
 
-// GetMapByMapID マップIDによるマップの取得
-func (s *DefaultMapService) GetMapByMapID(ctx context.Context, mapID string) (*models.Map, error) {
-	return s.mapRepo.GetByMapID(ctx, mapID)
-}
-
-// MapIDExists マップIDが既に存在するか確認
-func (s *DefaultMapService) MapIDExists(ctx context.Context, mapID string) (bool, error) {
-	m, err := s.mapRepo.GetByMapID(ctx, mapID)
-	if err != nil {
-		return false, err
-	}
-	return m != nil, nil
-}
-
 // CreateMap マップの作成
 func (s *DefaultMapService) CreateMap(ctx context.Context, m *models.Map) error {
-	// 重複チェック
-	exists, err := s.MapIDExists(ctx, m.MapID)
+	// IDの重複チェック
+	existingMap, err := s.mapRepo.GetByID(ctx, m.ID)
 	if err != nil {
 		return err
 	}
-	if exists {
-		return errors.New("このマップIDは既に使用されています")
+	if existingMap != nil {
+		return errors.New("このIDは既に使用されています")
 	}
 
 	return s.mapRepo.Create(ctx, m)

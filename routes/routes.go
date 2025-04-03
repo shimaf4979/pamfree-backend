@@ -23,8 +23,6 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config) {
 	if err != nil {
 		log.Fatalf("データベース接続エラー: %v", err)
 	}
-	log.Println("データベース接続成功")
-
 
 	// リポジトリの初期化
 	userRepo := repositories.NewMySQLUserRepository(db)
@@ -74,6 +72,10 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
+	router.GET("/api/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok"})
+	})
+
 	// 認証ルート
 	auth := router.Group("/api/auth")
 	{
@@ -95,10 +97,6 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config) {
 		maps.GET("/:mapId/floors", floorController.GetFloors)
 		maps.POST("/:mapId/floors", authMiddleware, floorController.CreateFloor)
 	}
-
-	// map_idによるマップ操作ルート
-	router.GET("/api/maps/by-map-id/:mapId", mapController.GetMapByMapID)
-	router.DELETE("/api/maps/by-map-id/:mapId", authMiddleware, mapController.DeleteMapByMapID)
 
 	// フロアルート
 	floors := router.Group("/api/floors")

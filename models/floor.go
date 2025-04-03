@@ -18,7 +18,7 @@ type Floor struct {
 
 // FloorCreate はフロア作成リクエストを表す構造体
 type FloorCreate struct {
-	MapID       string `json:"map_id" binding:"required"`
+	MapID       string `json:"mapId" binding:"required"`
 	FloorNumber int    `json:"floor_number" binding:"required"`
 	Name        string `json:"name" binding:"required"`
 }

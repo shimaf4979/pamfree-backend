@@ -13,7 +13,6 @@ import (
 type MapRepository interface {
 	Create(ctx context.Context, m *models.Map) error
 	GetByID(ctx context.Context, id string) (*models.Map, error)
-	GetByMapID(ctx context.Context, mapID string) (*models.Map, error)
 	GetByUserID(ctx context.Context, userID string) ([]*models.Map, error)
 	Update(ctx context.Context, m *models.Map) error
 	Delete(ctx context.Context, id string) error
@@ -36,15 +35,14 @@ func (r *MySQLMapRepository) Create(ctx context.Context, m *models.Map) error {
 	m.UpdatedAt = now
 
 	query := `
-		INSERT INTO maps (id, map_id, title, description, user_id, is_publicly_editable, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO maps (id, title, description, user_id, is_publicly_editable, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
 	`
 
 	_, err := r.db.ExecContext(
 		ctx,
 		query,
 		m.ID,
-		m.MapID,
 		m.Title,
 		m.Description,
 		m.UserID,
@@ -59,7 +57,7 @@ func (r *MySQLMapRepository) Create(ctx context.Context, m *models.Map) error {
 // GetByID はIDによりマップを取得する
 func (r *MySQLMapRepository) GetByID(ctx context.Context, id string) (*models.Map, error) {
 	query := `
-		SELECT id, map_id, title, description, user_id, is_publicly_editable, created_at, updated_at
+		SELECT id, title, description, user_id, is_publicly_editable, created_at, updated_at
 		FROM maps
 		WHERE id = ?
 	`
@@ -67,38 +65,6 @@ func (r *MySQLMapRepository) GetByID(ctx context.Context, id string) (*models.Ma
 	var m models.Map
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&m.ID,
-		&m.MapID,
-		&m.Title,
-		&m.Description,
-		&m.UserID,
-		&m.IsPubliclyEditable,
-		&m.CreatedAt,
-		&m.UpdatedAt,
-	)
-
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &m, nil
-}
-
-// GetByMapID はマップIDによりマップを取得する
-func (r *MySQLMapRepository) GetByMapID(ctx context.Context, mapID string) (*models.Map, error) {
-	query := `
-		SELECT id, map_id, title, description, user_id, is_publicly_editable, created_at, updated_at
-		FROM maps
-		WHERE map_id = ?
-	`
-
-	var m models.Map
-	err := r.db.QueryRowContext(ctx, query, mapID).Scan(
-		&m.ID,
-		&m.MapID,
 		&m.Title,
 		&m.Description,
 		&m.UserID,
@@ -121,7 +87,7 @@ func (r *MySQLMapRepository) GetByMapID(ctx context.Context, mapID string) (*mod
 // GetByUserID はユーザーIDによりマップ一覧を取得する
 func (r *MySQLMapRepository) GetByUserID(ctx context.Context, userID string) ([]*models.Map, error) {
 	query := `
-		SELECT id, map_id, title, description, user_id, is_publicly_editable, created_at, updated_at
+		SELECT id, title, description, user_id, is_publicly_editable, created_at, updated_at
 		FROM maps
 		WHERE user_id = ?
 		ORDER BY created_at DESC
@@ -138,7 +104,6 @@ func (r *MySQLMapRepository) GetByUserID(ctx context.Context, userID string) ([]
 		var m models.Map
 		if err := rows.Scan(
 			&m.ID,
-			&m.MapID,
 			&m.Title,
 			&m.Description,
 			&m.UserID,

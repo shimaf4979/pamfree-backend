@@ -8,7 +8,6 @@ import (
 // Map はマップ情報を表す構造体
 type Map struct {
 	ID                 string    `json:"id" db:"id"`
-	MapID              string    `json:"map_id" db:"map_id"`
 	Title              string    `json:"title" db:"title"`
 	Description        string    `json:"description" db:"description"`
 	UserID             string    `json:"user_id" db:"user_id"`
@@ -19,7 +18,7 @@ type Map struct {
 
 // MapCreate はマップ作成リクエストを表す構造体
 type MapCreate struct {
-	MapID              string `json:"map_id" binding:"required"`
+	ID                 string `json:"id" binding:"required"`
 	Title              string `json:"title" binding:"required"`
 	Description        string `json:"description"`
 	IsPubliclyEditable bool   `json:"is_publicly_editable"`

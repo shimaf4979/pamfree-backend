@@ -37,7 +37,7 @@ func NewViewerService(
 // GetMapData はマップの全データを取得する
 func (s *DefaultViewerService) GetMapData(ctx context.Context, mapID string) (*models.ViewerData, error) {
 	// マップデータを取得
-	mapData, err := s.mapRepo.GetByMapID(ctx, mapID)
+	mapData, err := s.mapRepo.GetByID(ctx, mapID)
 	if err != nil {
 		return nil, err
 	}
