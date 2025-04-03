@@ -38,7 +38,7 @@ func (c *ViewerController) GetMapData(ctx *gin.Context) {
 	}
 
 	// マップデータを取得
-	mapData, err := c.mapService.GetMapByMapID(ctx, mapID)
+	mapData, err := c.mapService.GetMapByID(ctx, mapID)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "マップの取得に失敗しました"})
 		return

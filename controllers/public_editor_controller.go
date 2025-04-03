@@ -35,7 +35,7 @@ func (c *PublicEditorController) Register(ctx *gin.Context) {
 	}
 
 	// マップが存在するか確認
-	mapData, err := c.mapService.GetMapByMapID(ctx, req.MapID)
+	mapData, err := c.mapService.GetMapByID(ctx, req.MapID)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "マップの取得に失敗しました"})
 		return

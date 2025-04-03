@@ -68,19 +68,19 @@ func (s *FloorServiceImpl) CreateFloor(ctx context.Context, req models.FloorCrea
 }
 
 // GetFloorsByMapID はマップに属するすべてのフロアを取得する
+// GetFloorsByMapID の修正 - 直接UUIDを使用
 func (s *FloorServiceImpl) GetFloorsByMapID(ctx context.Context, mapID string) ([]*models.Floor, error) {
-	// まずマップIDからマップを取得
-	mapObj, err := s.mapRepo.GetByMapID(ctx, mapID)
+	// マップの存在確認のみ行い、直接UUIDを使用
+	mapObj, err := s.mapRepo.GetByID(ctx, mapID)
 	if err != nil {
 		return nil, err
 	}
-
 	if mapObj == nil {
 		return nil, errors.New("マップが見つかりません")
 	}
 
-	// マップIDを使用してフロアを取得
-	return s.floorRepo.GetByMapID(ctx, mapObj.ID)
+	// 直接マップのUUID IDを使用
+	return s.floorRepo.GetByMapID(ctx, mapID)
 }
 
 // GetFloorByID はIDによりフロアを取得する

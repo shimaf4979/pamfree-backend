@@ -42,7 +42,7 @@ func NewPublicEditorService(
 // Register は新しい公開編集者を登録する
 func (s *DefaultPublicEditorService) Register(ctx context.Context, mapID, nickname string) (*models.PublicEditor, error) {
 	// マップの存在と公開編集可能性を確認
-	mapData, err := s.mapRepo.GetByMapID(ctx, mapID)
+	mapData, err := s.mapRepo.GetByID(ctx, mapID)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +62,7 @@ func (s *DefaultPublicEditorService) Register(ctx context.Context, mapID, nickna
 	// 公開編集者を作成
 	editor := &models.PublicEditor{
 		ID:          uuid.New().String(),
-		MapID:       mapData.ID,
+		MapID:       mapID,
 		Nickname:    nickname,
 		EditorToken: token,
 		CreatedAt:   time.Now(),
