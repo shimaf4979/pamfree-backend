@@ -8,7 +8,6 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/go-sql-driver/mysql"
 	"github.com/shimaf4979/pamfree-backend/config"
 	"github.com/shimaf4979/pamfree-backend/controllers"
 	"github.com/shimaf4979/pamfree-backend/middlewares"
