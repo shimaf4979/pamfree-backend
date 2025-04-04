@@ -1,18 +1,22 @@
 module github.com/shimaf4979/pamfree-backend
 
-go 1.18
+go 1.21.0
+
+toolchain go1.24.1
 
 require (
 	github.com/cloudinary/cloudinary-go/v2 v2.5.1
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/gin-contrib/cors v1.4.0
 	github.com/gin-gonic/gin v1.9.1
+	github.com/go-sql-driver/mysql v1.9.1
 	github.com/google/uuid v1.3.1
 	github.com/joho/godotenv v1.5.1
 	golang.org/x/crypto v0.14.0
 )
 
 require (
+	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/bytedance/sonic v1.10.2 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20230717121745-296ad89f973d // indirect
 	github.com/chenzhuoyu/iasm v0.9.0 // indirect

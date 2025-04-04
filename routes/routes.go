@@ -6,6 +6,8 @@ import (
 	"log"
 	"time"
 
+	_ "github.com/go-sql-driver/mysql"
+
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/shimaf4979/pamfree-backend/config"

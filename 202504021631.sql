@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS maps (
 -- フロア（エリア）テーブル
 CREATE TABLE IF NOT EXISTS floors (
   id VARCHAR(36) PRIMARY KEY,
+  map_id VARCHAR(36) NOT NULL,
   floor_number INT NOT NULL,
   name VARCHAR(255) NOT NULL,
   image_url TEXT,
@@ -65,6 +66,7 @@ CREATE TABLE IF NOT EXISTS pins (
 -- 公開編集者テーブル
 CREATE TABLE IF NOT EXISTS public_editors (
   id VARCHAR(36) PRIMARY KEY,
+  map_id VARCHAR(36) NOT NULL,
   nickname VARCHAR(255) NOT NULL,
   editor_token VARCHAR(255) NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

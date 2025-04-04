@@ -1,0 +1,60 @@
+-- users（ユーザー）テーブル
+CREATE TABLE IF NOT EXISTS users (
+  id VARCHAR(36) NOT NULL PRIMARY KEY,
+  email VARCHAR(255) NOT NULL UNIQUE,
+  password VARCHAR(255) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  role VARCHAR(50) NOT NULL DEFAULT 'user',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- maps（マップ）テーブル - map_idカラムなし
+CREATE TABLE IF NOT EXISTS maps (
+  id VARCHAR(36) NOT NULL PRIMARY KEY,
+  title VARCHAR(255) NOT NULL,
+  description TEXT,
+  user_id VARCHAR(36) NOT NULL,
+  is_publicly_editable BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- floors（フロア）テーブル
+CREATE TABLE IF NOT EXISTS floors (
+  id VARCHAR(36) NOT NULL PRIMARY KEY,
+  map_id VARCHAR(36) NOT NULL,       -- この参照は必要 - マップとフロアの関係を示す
+  floor_number INT NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  image_url TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (map_id) REFERENCES maps(id) ON DELETE CASCADE
+);
+
+-- pins（ピン）テーブル
+CREATE TABLE IF NOT EXISTS pins (
+  id VARCHAR(36) NOT NULL PRIMARY KEY,
+  floor_id VARCHAR(36) NOT NULL,     -- この参照は必要 - フロアとピンの関係を示す
+  title VARCHAR(255) NOT NULL,
+  description TEXT,
+  x_position FLOAT NOT NULL,
+  y_position FLOAT NOT NULL,
+  image_url TEXT,
+  editor_id VARCHAR(255),
+  editor_nickname VARCHAR(255),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (floor_id) REFERENCES floors(id) ON DELETE CASCADE
+);
+
+-- public_editors（公開編集者）テーブル
+CREATE TABLE IF NOT EXISTS public_editors (
+  id VARCHAR(36) NOT NULL PRIMARY KEY,
+  map_id VARCHAR(36) NOT NULL,       -- この参照は必要 - マップと編集者の関係を示す
+  nickname VARCHAR(255) NOT NULL,
+  editor_token VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (map_id) REFERENCES maps(id) ON DELETE CASCADE
+);

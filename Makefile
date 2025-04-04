@@ -81,15 +81,8 @@ cleanup:
 
 # すべてのコンテナとボリュームを削除 (完全クリーンアップ)
 clean:
-	@echo "警告: すべてのコンテナとボリュームを削除します。このアクションは元に戻せません！"
-	@echo "続行するには 'yes' と入力してください:"
-	@read -p "> " confirm; \
-	if [ "$$confirm" = "yes" ]; then \
-		echo "すべてのコンテナとボリュームを削除中..."; \
-		sudo docker-compose -f docker-compose.prod.yml down -v; \
-		sudo docker rmi -f pamfree-api:latest 2>/dev/null || true; \
-		sudo docker volume rm pamfree_uploads 2>/dev/null || true; \
-		echo "クリーンアップが完了しました！"; \
-	else \
-		echo "操作をキャンセルしました"; \
-	fi
+	@echo "すべてのコンテナとボリュームを削除中..."
+	sudo docker-compose -f docker-compose.prod.yml down -v
+	sudo docker rmi -f pamfree-api:latest 2>/dev/null || true
+	sudo docker volume rm pamfree_uploads 2>/dev/null || true
+	@echo "クリーンアップが完了しました！"
