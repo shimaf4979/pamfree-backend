@@ -1,0 +1,61 @@
+name: Pamfree Backend CI/CD
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Deploy to EC2
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ec2-user
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          # デプロイログディレクトリがなければ作成
+          mkdir -p ~/pamfree/logs
+          
+          # タイムスタンプを設定
+          TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
+          LOGFILE=~/pamfree/logs/deploy_${TIMESTAMP}.log
+          
+          # ログファイルにヘッダーを書き込み
+          echo "=======================================================" >> $LOGFILE
+          echo "デプロイ開始: ${TIMESTAMP}" >> $LOGFILE
+          echo "トリガー: GitHub Actions ワークフロー" >> $LOGFILE
+          echo "=======================================================" >> $LOGFILE
+          
+          # 各コマンドの実行とログ記録
+          echo "リポジトリの最新化を開始します..." >> $LOGFILE
+          cd ~/pamfree/pamfree-backend
+          git pull 2>&1 | tee -a $LOGFILE
+          
+          echo "\nクリーンアップを実行します..." >> $LOGFILE
+          make clean 2>&1 | tee -a $LOGFILE
+          
+          echo "\nt2.micro向け最適化ビルドを実行します..." >> $LOGFILE
+          make micro-build 2>&1 | tee -a $LOGFILE
+          
+          echo "\n本番環境アプリケーションをデプロイします..." >> $LOGFILE
+          make prod 2>&1 | tee -a $LOGFILE
+          
+          echo "\nアプリケーションの状態を確認します..." >> $LOGFILE
+          make status 2>&1 | tee -a $LOGFILE
+          
+          # デプロイ完了タイムスタンプ
+          echo "\n=======================================================" >> $LOGFILE
+          echo "デプロイ完了: $(date +"%Y-%m-%d_%H-%M-%S")" >> $LOGFILE
+          echo "=======================================================" >> $LOGFILE
+          
+          # 最新のログへのシンボリックリンクを作成
+          ln -sf $LOGFILE ~/pamfree/logs/latest_deploy.log
+          
+          # 成功メッセージを表示（Actions UIに表示される）
+          echo "デプロイが完了しました。ログは ${LOGFILE} に保存されています。"
