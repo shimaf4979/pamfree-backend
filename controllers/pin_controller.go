@@ -56,6 +56,9 @@ func (c *PinController) GetPinsByFloorID(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	if pins == nil {
+		pins = []*models.Pin{}
+	}
 
 	ctx.JSON(http.StatusOK, pins)
 }

@@ -34,6 +34,9 @@ func (c *MapController) GetMaps(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "マップの取得に失敗しました"})
 		return
 	}
+	if maps == nil {
+		maps = []*models.Map{}
+	}
 
 	ctx.JSON(http.StatusOK, maps)
 }

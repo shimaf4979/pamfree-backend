@@ -247,6 +247,9 @@ func (c *AuthController) GetAllUsers(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "ユーザー一覧の取得に失敗しました"})
 		return
 	}
+	if users == nil {
+		users = []*models.User{}
+	}
 
 	// レスポンスから機密情報を削除
 	var usersResponse []models.UserResponse

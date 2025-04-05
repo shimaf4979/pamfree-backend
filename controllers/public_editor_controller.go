@@ -58,6 +58,11 @@ func (c *PublicEditorController) Register(ctx *gin.Context) {
 		return
 	}
 
+	if editor == nil {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "編集者が見つかりません"})
+		return
+	}
+
 	// レスポンスを構築
 	response := models.PublicEditorResponse{
 		EditorID: editor.ID,

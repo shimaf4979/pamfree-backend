@@ -54,6 +54,9 @@ func (c *ViewerController) GetMapData(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "フロアの取得に失敗しました"})
 		return
 	}
+	if floors == nil {
+		floors = []*models.Floor{}
+	}
 
 	// ピンデータを取得
 	var pins []*models.Pin
@@ -69,6 +72,9 @@ func (c *ViewerController) GetMapData(ctx *gin.Context) {
 		if err != nil {
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "ピンの取得に失敗しました"})
 			return
+		}
+		if pins == nil {
+			pins = []*models.Pin{}
 		}
 	}
 

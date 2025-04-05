@@ -56,6 +56,9 @@ func (c *FloorController) GetFloors(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	if floors == nil {
+		floors = []*models.Floor{}
+	}
 
 	ctx.JSON(http.StatusOK, floors)
 }
