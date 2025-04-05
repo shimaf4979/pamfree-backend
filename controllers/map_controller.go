@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/shimaf4979/pamfree-backend/models"
 	"github.com/shimaf4979/pamfree-backend/services"
 )
@@ -87,7 +86,7 @@ func (c *MapController) CreateMap(ctx *gin.Context) {
 
 	// マップの作成
 	m := &models.Map{
-		ID:                 uuid.New().String(),
+		ID:                 req.ID, // クライアントからIDを受け取る
 		Title:              req.Title,
 		Description:        req.Description,
 		UserID:             userID.(string),
